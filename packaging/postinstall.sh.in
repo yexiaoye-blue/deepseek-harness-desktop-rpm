@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+resource_root=@RESOURCE_ROOT@
+# Match upstream's Copr package: a root-owned, setuid Chromium sandbox helper.
+if [ -d "$resource_root/runtime" ]; then
+    find "$resource_root/runtime" -type f -name chrome-sandbox \
+        -exec chown root:root '{}' \; -exec chmod 4755 '{}' \;
+fi
