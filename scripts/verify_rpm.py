@@ -35,16 +35,12 @@ def verify(source, version, arch, sha, destination):
     highest = (0, 0)
     elf_count = 0
     with tempfile.TemporaryDirectory(prefix="rpm-verify-") as temp:
-        unpack = subprocess.Popen(["rpm2cpio", str(artifact)], stdout=subprocess.PIPE)
-        try:
-            result = subprocess.run(["cpio", "-idm", "--quiet", "--no-absolute-filenames"], cwd=temp, stdin=unpack.stdout, capture_output=True)
-            unpack.stdout.close()
-            if unpack.wait() or result.returncode:
-                raise ValueError("Could not extract RPM payload")
-        finally:
-            if unpack.poll() is None:
-                unpack.kill()
-                unpack.wait()
+        result = subprocess.run(
+            ["bsdtar", "--no-same-owner", "--no-same-permissions", "-xf", str(artifact), "-C", temp],
+            capture_output=True, text=True,
+        )
+        if result.returncode:
+            raise ValueError("Could not extract RPM payload: " + result.stderr.strip())
         for file in Path(temp).rglob("*"):
             if not file.is_file() or file.is_symlink():
                 continue
