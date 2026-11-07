@@ -9,7 +9,8 @@ import subprocess
 import sys
 import tempfile
 
-from plan import package_name
+from plan import package_name, RPM_RELEASE
+from brand_electron import MARKER
 
 
 def command(*args):
@@ -22,7 +23,7 @@ def verify(source, version, arch, sha, destination):
         raise ValueError(f"Expected one RPM, found {len(candidates)}")
     artifact = candidates[0].resolve()
     identity = command("rpm", "-qp", "--queryformat", "%{NAME}\n%{VERSION}\n%{RELEASE}\n%{ARCH}\n", str(artifact)).splitlines()
-    if identity != ["dsh-tauri", version, "1.github", arch]:
+    if identity != ["dsh-tauri", version, RPM_RELEASE, arch]:
         raise ValueError(f"Unexpected RPM identity: {identity}")
     files = command("rpm", "-qlp", str(artifact)).splitlines()
     required = ["/usr/bin/deepseek-harness-desktop", "/usr/lib/DSH Tauri/licenses/upstream/LICENSE", "/usr/lib/DSH Tauri/licenses/upstream/LICENSE.details"]
@@ -41,6 +42,16 @@ def verify(source, version, arch, sha, destination):
         )
         if result.returncode:
             raise ValueError("Could not extract RPM payload: " + result.stderr.strip())
+        resource_root = Path(temp) / "usr/lib/DSH Tauri"
+        if not (resource_root / "icons/app.png").is_file():
+            raise ValueError("RPM is missing its high-resolution application icon")
+        entries = list((resource_root / "runtime").glob("linux-*/main.cjs"))
+        if not entries or not all(entry.read_text().startswith(MARKER) for entry in entries):
+            raise ValueError("RPM is missing its Linux desktop identity bootstrap")
+        desktop = Path(temp) / "usr/share/applications/DSH Tauri.desktop"
+        desktop_text = desktop.read_text()
+        if "Name=DSH Tauri" not in desktop_text or "StartupWMClass=deepseek-harness-desktop" not in desktop_text:
+            raise ValueError("Desktop launcher and Electron window identity do not match")
         for file in Path(temp).rglob("*"):
             if not file.is_file() or file.is_symlink():
                 continue
