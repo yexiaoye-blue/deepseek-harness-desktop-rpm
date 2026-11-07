@@ -35,8 +35,9 @@ def prepare(plan_path, asset_dir):
     output.write_text(json.dumps(provenance, indent=2) + "\n")
     checksums.append(f"{hashlib.sha256(output.read_bytes()).hexdigest()}  UPSTREAM.json\n")
     (assets / "SHA256SUMS").write_text("".join(checksums))
-    body = f"""Community RPM packages for [DSH Tauri {plan['tag']}]({plan['upstream_release_url']}).
+    body = f"""Community RPM packages for [DSH Tauri {plan['upstream_tag']}]({plan['upstream_release_url']}).
 
+- RPM packaging revision: **{plan['packaging_revision']}** (application version unchanged)
 - Upstream source: `{plan['source_sha']}`
 - Architectures: **x86_64** and **aarch64**
 - Target distribution: **Fedora 43+**

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from plan import make_plan, package_name, ARCHES
+from plan import make_plan, package_name, ARCHES, RPM_RELEASE, release_tag
 from prepare_rpm import prepare as prepare_rpm
 from release_files import prepare as prepare_release
 
@@ -17,7 +17,7 @@ RELEASE = {"id": 123, "tag_name": "v0.30.4", "draft": False, "prerelease": False
 
 def existing_release():
     names = [package_name("0.30.4", arch) for arch in ARCHES] + ["SHA256SUMS", "UPSTREAM.json"]
-    return {"tag_name": "v0.30.4", "draft": False, "prerelease": False,
+    return {"tag_name": release_tag("v0.30.4"), "draft": False, "prerelease": False,
             "body": f"<!-- upstream-sha:{SHA} -->",
             "assets": [{"name": name, "state": "uploaded", "size": 10} for name in names]}
 
@@ -27,6 +27,9 @@ class ReleaseSelectionTests(unittest.TestCase):
         plan = make_plan(RELEASE, SHA)
         self.assertTrue(plan["should_build"])
         self.assertEqual(plan["source_sha"], SHA)
+        self.assertEqual(plan["tag"], "v0.30.4-rpm.2")
+        self.assertEqual(plan["upstream_tag"], "v0.30.4")
+        self.assertEqual(plan["version"], "0.30.4")
 
     def test_prerelease_draft_and_non_stable_tags_are_rejected(self):
         for override in ({"prerelease": True}, {"draft": True}, {"tag_name": "v0.30.4-beta.1"}, {"tag_name": "nightly"}, {"tag_name": "v0.30.4\nmain"}):
@@ -79,7 +82,7 @@ class PackagingTests(unittest.TestCase):
             output = prepare_rpm(root, "0.30.4", packager)
             data = json.loads(output.read_text())
             self.assertEqual((tauri / "tauri.conf.json").read_text(), original)
-            self.assertEqual(data["bundle"]["linux"]["rpm"]["release"], "1.github")
+            self.assertEqual(data["bundle"]["linux"]["rpm"]["release"], RPM_RELEASE)
             self.assertTrue((output.parent / "licenses/LICENSE.details").exists())
             hook = Path(data["bundle"]["linux"]["rpm"]["postInstallScript"]).read_text()
             self.assertIn("resource_root='/usr/lib/DSH Tauri'", hook)

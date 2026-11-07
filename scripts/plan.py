@@ -12,10 +12,16 @@ from urllib.request import Request, urlopen
 
 UPSTREAM = "dsh-tauri/deepseek-harness-desktop"
 ARCHES = ("x86_64", "aarch64")
+PACKAGING_REVISION = 2
+RPM_RELEASE = f"{PACKAGING_REVISION}.github"
+
+
+def release_tag(upstream_tag):
+    return upstream_tag if PACKAGING_REVISION == 1 else f"{upstream_tag}-rpm.{PACKAGING_REVISION}"
 
 
 def package_name(version, arch):
-    return f"dsh-tauri-{version}-1.github.{arch}.rpm"
+    return f"dsh-tauri-{version}-{RPM_RELEASE}.{arch}.rpm"
 
 
 def make_plan(release, sha, existing=None, force=False):
@@ -30,7 +36,7 @@ def make_plan(release, sha, existing=None, force=False):
     expected = {package_name(version, arch) for arch in ARCHES} | {"SHA256SUMS", "UPSTREAM.json"}
     complete = False
     if existing:
-        if existing.get("tag_name") != tag:
+        if existing.get("tag_name") != release_tag(tag):
             raise ValueError("Destination release tag does not match upstream")
         marker = re.search(r"<!-- upstream-sha:([0-9a-f]{40}) -->", existing.get("body") or "")
         if not marker or marker.group(1) != sha:
@@ -39,7 +45,10 @@ def make_plan(release, sha, existing=None, force=False):
         complete = not existing.get("draft", True) and not existing.get("prerelease", True) and expected <= names
     return {
         "should_build": force or not complete,
-        "tag": tag,
+        "tag": release_tag(tag),
+        "upstream_tag": tag,
+        "packaging_revision": PACKAGING_REVISION,
+        "rpm_release": RPM_RELEASE,
         "version": version,
         "source_sha": sha,
         "upstream_repository": UPSTREAM,
@@ -76,7 +85,7 @@ def main():
     make_plan(release, "0" * 40)
     tag = release["tag_name"]
     commit = api(f"/repos/{UPSTREAM}/commits/{quote(tag, safe='')}")
-    existing = api(f"/repos/{destination}/releases/tags/{quote(tag, safe='')}", missing_ok=True)
+    existing = api(f"/repos/{destination}/releases/tags/{quote(release_tag(tag), safe='')}", missing_ok=True)
     plan = make_plan(release, commit["sha"], existing, os.environ.get("FORCE_REBUILD") == "true")
     Path(".plan.json").write_text(json.dumps(plan, indent=2) + "\n")
     if os.environ.get("GITHUB_OUTPUT"):

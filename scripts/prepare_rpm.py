@@ -7,6 +7,8 @@ import shlex
 import shutil
 import sys
 
+from plan import RPM_RELEASE
+
 DEPENDENCIES = [
     "gtk3", "libappindicator-gtk3", "alsa-lib", "nss", "mesa-libgbm", "libdrm",
     "libX11", "libXcomposite", "libXdamage", "libXrandr", "libXtst", "libXScrnSaver",
@@ -36,11 +38,11 @@ def prepare(root, version, packager):
         source = root / name
         if name != "THIRD_PARTY_NOTICES.md" or source.exists():
             shutil.copyfile(source, notices / name)
-    overlay = {"bundle": {
+    overlay = {"build": {"beforeBundleCommand": "python3 " + shlex.quote(str(packager / "scripts/before_bundle.py")) + " " + shlex.quote(str(root))}, "bundle": {
         "license": "LicenseRef-DSH-Tauri",
-        "resources": {str(notices): "licenses/upstream"},
+        "resources": {str(notices): "licenses/upstream", str(tauri / "icons/icon.png"): "icons/app.png"},
         "linux": {"rpm": {
-            "release": "1.github",
+            "release": RPM_RELEASE,
             "depends": DEPENDENCIES,
             "conflicts": ["dsh-tauri-beta", "deepseek-harness-desktop"],
             "postInstallScript": str(hook),
